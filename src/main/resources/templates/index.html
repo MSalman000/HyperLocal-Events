@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyperlocal Events Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+        }
+        .event-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .event-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .live-dot {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .modal {
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal-content {
+            transition: transform 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-4xl">
+        
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800">
+                📍 Nearby Events & Requests
+            </h1>
+            <p class="text-gray-500 mt-2">Your community's live pulse. Discover and engage.</p>
+        </header>
+
+        <!-- Controls -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div class="relative w-full md:w-1/2">
+                <input type="text" id="search-box" onkeyup="filterEvents()" placeholder="Search for events, places, or types..." class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow">
+                <svg class="w-6 h-6 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+            <a href="/events/create" class="w-full md:w-auto bg-indigo-600 text-white font-bold py-3 px-6 rounded-full hover:bg-indigo-700 transition-transform transform hover:scale-105 shadow-lg">
+                + Create New Event
+            </a>
+        </div>
+
+        <!-- Events Grid -->
+        <div id="events-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div th:if="${#lists.isEmpty(events)}" class="col-span-full text-center py-12">
+                <p class="text-gray-500">No events found at the moment. Why not create one?</p>
+            </div>
+            
+            <div th:each="event, iter : ${events}" class="event-card bg-white rounded-xl shadow-md overflow-hidden cursor-pointer" th:attr="onclick=|openModal(${iter.index})|">
+                <div class="p-6">
+                    <!-- FIX: The logic for the 'LIVE' indicator is now cleaner and more robust -->
+                    <div th:with="isLive=${T(java.time.LocalDate).parse(event.date).isEqual(T(java.time.LocalDate).now()) and T(java.time.LocalTime).now().isAfter(T(java.time.LocalTime).parse(event.time, T(java.time.format.DateTimeFormatter).ofPattern('hh:mm a', T(java.util.Locale).ENGLISH)))}">
+                        <div class="flex justify-between items-start">
+                            <div class="tracking-wide text-sm text-indigo-500 font-semibold" th:text="${#strings.toUpperCase(event.location)}">LOCATION</div>
+                            <!-- Live Indicator Logic -->
+                            <div th:if="${isLive}" class="flex items-center">
+                                 <span class="h-3 w-3 bg-red-500 rounded-full live-dot mr-2"></span>
+                                 <span class="text-xs font-semibold text-red-500">LIVE</span>
+                            </div>
+                        </div>
+                    </div>
+                    <h2 class="block mt-1 text-lg leading-tight font-bold text-black" th:text="${event.title}">Event Title</h2>
+                    <p class="mt-2 text-gray-500 text-sm" th:text="${#strings.abbreviate(event.description, 80)}">Event description...</p>
+                </div>
+                <div class="bg-gray-50 px-6 py-3 border-t border-gray-200">
+                    <div class="flex items-center text-sm text-gray-600">
+                        <span class="mr-4">📅 <span th:text="${event.date}">Date</span></span>
+                        <span>⏰ <span th:text="${event.time}">Time</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="event-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 opacity-0 invisible" onclick="closeModal()">
+        <div class="modal-content bg-white rounded-lg shadow-2xl w-full max-w-lg mx-auto transform scale-95" onclick="event.stopPropagation()">
+            <!-- Modal content will be injected by JavaScript -->
+        </div>
+    </div>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const events = /*[[${events}]]*/ [];
+
+    function filterEvents() {
+        const query = document.getElementById('search-box').value.toLowerCase();
+        const grid = document.getElementById('events-grid');
+        const cards = grid.getElementsByClassName('event-card');
+
+        for (let i = 0; i < cards.length; i++) {
+            const title = events[i].title.toLowerCase();
+            const location = events[i].location.toLowerCase();
+            const description = events[i].description.toLowerCase();
+            if (title.includes(query) || location.includes(query) || description.includes(query)) {
+                cards[i].style.display = "";
+            } else {
+                cards[i].style.display = "none";
+            }
+        }
+    }
+
+    function openModal(index) {
+        const event = events[index];
+        const modal = document.getElementById('event-modal');
+        const modalContent = modal.querySelector('.modal-content');
+
+        modalContent.innerHTML = `
+            <div class="p-6 md:p-8">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="tracking-wide text-sm text-indigo-500 font-semibold">${event.location.toUpperCase()}</div>
+                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">&times;</button>
+                </div>
+                <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${event.title}</h2>
+                <p class="text-gray-600 mb-6">${event.description}</p>
+                <div class="flex flex-wrap gap-4 text-gray-700">
+                    <span class="bg-gray-100 rounded-full px-4 py-2 text-sm">📅 ${event.date}</span>
+                    <span class="bg-gray-100 rounded-full px-4 py-2 text-sm">⏰ ${event.time}</span>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 text-right">
+                <button onclick="closeModal()" class="bg-indigo-600 text-white font-bold py-2 px-5 rounded-full hover:bg-indigo-700 transition">Close</button>
+            </div>
+        `;
+        
+        modal.classList.remove('invisible', 'opacity-0');
+        modal.querySelector('.modal-content').classList.remove('scale-95');
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('event-modal');
+        modal.classList.add('invisible', 'opacity-0');
+        modal.querySelector('.modal-content').classList.add('scale-95');
+    }
+    /*]]>*/
+</script>
+
+</body>
+</html>
