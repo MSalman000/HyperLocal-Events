@@ -5,4 +5,4 @@ builder = "nixpacks"
 startCommand = "java -jar target/events-0.0.1-SNAPSHOT.jar"
 
 [variables]
-NIXPACKS_JDK_VERSION = "21"
+NIXPACKS_JDK_VERSION = "17"
