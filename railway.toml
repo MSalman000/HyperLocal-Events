@@ -1,0 +1,8 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "java -jar target/events-0.0.1-SNAPSHOT.jar"
+
+[variables]
+NIXPACKS_JDK_VERSION = "21"
